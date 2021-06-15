@@ -13,4 +13,8 @@
 	<string name="scan_now">Scan now</string>
 	<string name="date">date</string>
 	<string name="value">value</string>
+	<string name="userid">userID</string>
+	<string name="id">id</string>
+	<string name="title">title</string>
+	<string name="body">body</string>
 </resources>
