@@ -11,4 +11,6 @@
 	<string name="menu_gallery">Barcode List</string>
 	<string name="menu_slideshow">JSON parsing</string>
 	<string name="scan_now">Scan now</string>
+	<string name="date">date</string>
+	<string name="value">value</string>
 </resources>
