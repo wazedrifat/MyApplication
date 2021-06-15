@@ -1,6 +1,7 @@
 package com.wazedrifat.myapplication.ui.home;
 
 import androidx.annotation.NonNull;
+import androidx.annotation.RequiresApi;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.camera.core.CameraSelector;
 import androidx.camera.core.ImageAnalysis;
@@ -19,7 +20,9 @@ import android.content.pm.PackageManager;
 import android.graphics.Point;
 import android.graphics.Rect;
 import android.media.Image;
+import android.os.Build;
 import android.os.Bundle;
+import android.util.Log;
 import android.util.Size;
 
 import com.google.android.gms.tasks.OnCompleteListener;
@@ -27,31 +30,56 @@ import com.google.android.gms.tasks.OnFailureListener;
 import com.google.android.gms.tasks.OnSuccessListener;
 import com.google.android.gms.tasks.Task;
 import com.google.common.util.concurrent.ListenableFuture;
+import com.google.firebase.database.DataSnapshot;
+import com.google.firebase.database.DatabaseError;
+import com.google.firebase.database.DatabaseReference;
+import com.google.firebase.database.FirebaseDatabase;
+import com.google.firebase.database.ValueEventListener;
+import com.google.firebase.firestore.DocumentReference;
+import com.google.firebase.firestore.FirebaseFirestore;
 import com.google.mlkit.vision.barcode.Barcode;
 import com.google.mlkit.vision.barcode.BarcodeScanner;
 import com.google.mlkit.vision.barcode.BarcodeScannerOptions;
 import com.google.mlkit.vision.barcode.BarcodeScanning;
 import com.google.mlkit.vision.common.InputImage;
-import com.wazedrifat.myapplication.MainActivity;
+import com.wazedrifat.myapplication.Data;
 import com.wazedrifat.myapplication.R;
 
+import java.text.ParseException;
+import java.text.SimpleDateFormat;
+import java.time.Duration;
+import java.util.ArrayList;
+import java.util.Calendar;
+import java.util.Date;
 import java.util.List;
+import java.util.Locale;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 
 public class ScanBarcode extends AppCompatActivity {
 
-	private ListenableFuture cameraProviderFuture;
+	private ListenableFuture<ProcessCameraProvider> cameraProviderFuture;
 	private ExecutorService cameraExecutor;
 	private PreviewView previewView;
 	private  MyImageAnalyzer analyzer;
+	FirebaseDatabase database;
+	DatabaseReference myRef;
+	List<Data> dataList;
+	FirebaseFirestore db;
+	private Date time;
 
 	@Override
 	protected void onCreate(Bundle savedInstanceState) {
 		super.onCreate(savedInstanceState);
 		setContentView(R.layout.activity_scan_barcode);
 
+		Calendar cal = Calendar.getInstance();
+		cal.add(Calendar.HOUR,  - 1);
+		time = cal.getTime();
+
+		db = FirebaseFirestore.getInstance();
 		previewView = findViewById(R.id.previewID);
 		this.getWindow().setFlags(1024, 1024);
 
@@ -59,6 +87,8 @@ public class ScanBarcode extends AppCompatActivity {
 		cameraProviderFuture = ProcessCameraProvider.getInstance(this);
 
 		analyzer = new MyImageAnalyzer(getSupportFragmentManager());
+
+		dataList = new ArrayList<Data>();
 
 		cameraProviderFuture.addListener(new Runnable() {
 			@Override
@@ -68,7 +98,7 @@ public class ScanBarcode extends AppCompatActivity {
 						ActivityCompat.requestPermissions(ScanBarcode.this, new String[]{Manifest.permission.CAMERA}, 101);
 					}
 					else {
-						ProcessCameraProvider processCameraProvider = (ProcessCameraProvider) cameraProviderFuture.get();
+						ProcessCameraProvider processCameraProvider = cameraProviderFuture.get();
 						bindpreview(processCameraProvider);
 					}
 				} catch (InterruptedException | ExecutionException e) {
@@ -76,6 +106,25 @@ public class ScanBarcode extends AppCompatActivity {
 				}
 			}
 		}, ContextCompat.getMainExecutor(this));
+
+//		database = FirebaseDatabase.getInstance();
+//		myRef = database.getReference("message");
+
+
+//		myRef.addValueEventListener(new ValueEventListener() {
+//			@Override
+//			public void onDataChange(DataSnapshot dataSnapshot) {
+//				// This method is called once with the initial value and again
+//				// whenever data at this location is updated.
+//				 = dataSnapshot.getValue(List.class);
+//
+//			}
+//
+//			@Override
+//			public void onCancelled(@NonNull DatabaseError error) {
+//
+//			}
+//		});
 	}
 
 	@Override
@@ -85,7 +134,7 @@ public class ScanBarcode extends AppCompatActivity {
 		if (requestCode == 101 && grantResults.length > 0) {
 			ProcessCameraProvider processCameraProvider = null;
 			try {
-				processCameraProvider = (ProcessCameraProvider) cameraProviderFuture.get();
+				processCameraProvider = cameraProviderFuture.get();
 			} catch (ExecutionException | InterruptedException e) {
 				e.printStackTrace();
 			}
@@ -132,10 +181,15 @@ public class ScanBarcode extends AppCompatActivity {
 
 		Task<List<Barcode>> result = scanner.process(inputImage)
 				.addOnSuccessListener(new OnSuccessListener<List<Barcode>>() {
+					@RequiresApi(api = Build.VERSION_CODES.O)
 					@Override
 					public void onSuccess(List<Barcode> barcodes) {
 						// Task completed successfully
-						readBarcodeData(barcodes);
+						try {
+							readBarcodeData(barcodes);
+						} catch (ParseException e) {
+							e.printStackTrace();
+						}
 					}
 				})
 				.addOnFailureListener(new OnFailureListener() {
@@ -152,7 +206,9 @@ public class ScanBarcode extends AppCompatActivity {
 				});
 	}
 
-	private void readBarcodeData(List<Barcode> barcodes) {
+	@RequiresApi(api = Build.VERSION_CODES.O)
+	private void readBarcodeData(List<Barcode> barcodes) throws ParseException {
+		Data data = null;
 		for (Barcode barcode: barcodes) {
 			Rect bounds = barcode.getBoundingBox();
 			Point[] corners = barcode.getCornerPoints();
@@ -160,6 +216,12 @@ public class ScanBarcode extends AppCompatActivity {
 			String rawValue = barcode.getRawValue();
 
 			HomeFragment.res.setText(rawValue);
+			data = new Data(rawValue);
+
+
+//			dataList.add(new Data(rawValue));
+//			myRef.setValue(dataList);
+
 
 //			int valueType = barcode.getValueType();
 			// See API reference for complete list of supported types
@@ -176,6 +238,30 @@ public class ScanBarcode extends AppCompatActivity {
 //			}
 		}
 
-		finish();
+
+		if (data != null) {
+			Duration d = Duration.between(data.getTime().toInstant(), time.toInstant());
+			Log.d("myTime", String.valueOf(d.getSeconds() > 2));
+			Log.d("myTime", String.valueOf(d.getSeconds()));
+			if (Math.abs(d.getSeconds()) > 2) {
+				time = Calendar.getInstance().getTime();
+
+				db.collection("users")
+						.add(data)
+						.addOnSuccessListener(new OnSuccessListener<DocumentReference>() {
+							@Override
+							public void onSuccess(DocumentReference documentReference) {
+								Log.d("firestore", "DocumentSnapshot added with ID: " + documentReference.getId());
+							}
+						})
+						.addOnFailureListener(new OnFailureListener() {
+							@Override
+							public void onFailure(@NonNull Exception e) {
+								Log.w("firestore", "Error adding document", e);
+							}
+						});
+			}
+			finish();
+		}
 	}
 }
