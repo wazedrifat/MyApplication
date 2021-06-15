@@ -9,3 +9,4 @@ Email : wazedrifat@gmail.com
 2. Loads saved barcodes with time from Firestore in a Recycle VIew
 3. parse a JSON data (https://jsonplaceholder.typicode.com/posts) & shows it in a Recycle View.
 
+Developed in around 4 hours
